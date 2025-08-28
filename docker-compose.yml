@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  postgres-user:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: userdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - user_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  postgres-post:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: postdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - post_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  postgres-comment:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: commentdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - comment_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+
+  user-service:
+    build: ./user-service
+    ports:
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres-user:5432/userdb
+    depends_on:
+      - postgres-user
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  post-service:
+    build: ./post-service
+    ports:
+      - "8002:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres-post:5432/postdb
+      - USER_SERVICE_URL=http://user-service:8000
+    depends_on:
+      - postgres-post
+      - user-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  comment-service:
+    build: ./comment-service
+    ports:
+      - "8003:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres-comment:5432/commentdb
+      - USER_SERVICE_URL=http://user-service:8000
+      - POST_SERVICE_URL=http://post-service:8000
+    depends_on:
+      - postgres-comment
+      - user-service
+      - post-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+volumes:
+  user_data:
+  post_data:
+  comment_data:
+
+frontend:
+  build: ./frontend
+  ports:
+    - "3000:3000"
+  depends_on:
+    - user-service
+    - post-service
+    - comment-service

@@ -1,0 +1,13 @@
+from fastapi import FastAPI
+from .database import engine, Base
+from .routes import router
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="User Service", version="1.0.0")
+
+app.include_router(router, prefix="/api/v1", tags=["users"])
+
+@app.get("/health")
+def health_check():
+    return {"service": "user-service", "status": "healthy"}
